@@ -4,6 +4,10 @@ Malá aplikace na telefon pro Oskara, Felixe a Heřmana. Zapisuje se v ní krmen
 
 Je to statická webová stránka bez serveru a bez účtů. Všechna data i fotky zůstávají jen v prohlížeči telefonu, ve kterém se aplikace používá.
 
+## Připomínky
+
+Aplikace nemá server, takže připomínky posílá kalendář v telefonu. V okně **Léky** je tlačítko *⏰ Připomínat v kalendáři*. U očkování, odčervení a odblešení je tlačítko ⏰. Obojí vytvoří předvyplněnou událost v Google Kalendáři, případně soubor .ics pro jiný kalendář, a nastavit jde i opakování.
+
 ## Soubory
 
 | Soubor | K čemu je |
