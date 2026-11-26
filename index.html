@@ -885,7 +885,8 @@ $("importFile").addEventListener("change",async()=>{const f=$("importFile").file
   catch(e){toast("Tohle není záloha z aplikace Kočky doma.")}});
 
 /* ---------- sync with Supabase (optional; the app works without it) ---------- */
-const SB={url:"",key:""}; // project URL and publishable (anon) key; empty = sync off
+// project URL and publishable key (public by design; access is limited by row-level security and sign-in)
+const SB={url:"https://eldogxepostbideqdeik.supabase.co",key:"sb_publishable_TgiLY1Dn7qqur0ILSyhNbg__-Sjrmup"};
 const syncOn=()=>!!(SB.url&&SB.key);
 const SEP="\u0001";
 let session=null,outbox={},lastPull="",syncing=false,syncTimer=null,lastSyncOk=null,syncErr="";

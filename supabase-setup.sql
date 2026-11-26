@@ -15,6 +15,11 @@ create table if not exists public.items (
 );
 create index if not exists items_updated_at on public.items (updated_at);
 
+-- Signed-in members only; anonymous visitors get nothing.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.items to authenticated;
+revoke all on public.items from anon;
+
 alter table public.items enable row level security;
 drop policy if exists "household members" on public.items;
 create policy "household members" on public.items

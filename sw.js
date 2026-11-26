@@ -1,5 +1,5 @@
 // Offline cache for the app shell. Bump VERSION after changing any file.
-const VERSION = "kocky-v8";
+const VERSION = "kocky-v9";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
