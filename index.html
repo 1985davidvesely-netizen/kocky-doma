@@ -110,6 +110,12 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
 .dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .dlg-foot .grow{margin-right:auto}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+.sync{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.sync-form{display:flex;flex-direction:column;gap:10px;max-width:420px}
+.sync-in{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+.sync-pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--muted)}
+.sync-pill.ok{background:var(--ok-soft);color:var(--ok)}
+.sync-pill.err{background:var(--warn-soft);color:var(--warn)}
 .courses{display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px}
 .course{display:flex;flex-direction:column;gap:6px}
 .course-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -196,6 +202,7 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
     <div>
       <div class="label" id="today"></div>
       <h1>Kočky doma</h1>
+      <span class="sync-pill" id="syncPill" hidden></span>
     </div>
     <button class="primary" id="addCat">+ Přidat kočku</button>
   </header>
@@ -249,6 +256,21 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
       <div class="filters" id="filters"></div>
     </div>
     <div id="journal"></div>
+  </section>
+
+  <section class="sync" id="syncBox" aria-label="Sdílení dat" hidden>
+    <h2>Sdílení mezi telefony</h2>
+    <form id="syncLogin" class="sync-form">
+      <p class="sub" style="margin:0">Přihlaste se a data se budou sdílet se všemi, kdo se přihlásí do stejné domácnosti. Bez přihlášení aplikace funguje dál jen v tomto telefonu.</p>
+      <div class="field"><label for="sEmail">E-mail</label><input id="sEmail" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="sPass">Heslo</label><input id="sPass" type="password" autocomplete="current-password" required></div>
+      <div class="dlg-foot"><button class="primary" id="sLoginBtn">Přihlásit</button></div>
+      <p class="sub" id="sLoginErr" style="margin:0;color:var(--bad)" hidden></p>
+    </form>
+    <div id="syncIn" class="sync-in" hidden>
+      <div><strong id="sWho"></strong><div class="sub" id="sState"></div></div>
+      <div class="m-actions"><button class="small" id="sNow">Synchronizovat</button><button class="small" id="sOut">Odhlásit</button></div>
+    </div>
   </section>
 
   <section class="backup" aria-label="Záloha">
@@ -409,8 +431,13 @@ window.addEventListener("error",e=>showStatus("Něco se pokazilo: "+(e.message||
 window.addEventListener("unhandledrejection",e=>showStatus("Něco se pokazilo: "+((e.reason&&e.reason.message)||e.reason||"neznámá chyba")+". Zkuste aplikaci zavřít a otevřít znovu. Data jsou uložená."));
 function tx(store,mode,fn){return new Promise((res,rej)=>{const t=idb.transaction(store,mode);const out=fn(t);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})}
 const getAll=s=>tx(s,"readonly",t=>t.objectStore(s).getAll());
-const put=(s,v,k)=>tx(s,"readwrite",t=>{k===undefined?t.objectStore(s).put(v):t.objectStore(s).put(v,k)});
-const del=(s,k)=>tx(s,"readwrite",t=>{t.objectStore(s).delete(k)});
+const rawPut=(s,v,k)=>tx(s,"readwrite",t=>{k===undefined?t.objectStore(s).put(v):t.objectStore(s).put(v,k)});
+const rawDel=(s,k)=>tx(s,"readwrite",t=>{t.objectStore(s).delete(k)});
+// user edits go through put/del: stamped with edit time and queued for sync
+const SYNC_META=new Set(["manual","courses"]);
+async function put(s,v,k){const now=Date.now();if((s==="cats"||s==="log")&&v&&typeof v==="object")v._m=now;await rawPut(s,v,k);
+  if(s==="cats"||s==="log")enqueue(s,v.id,now);else if(s==="photos")enqueue("photos",k,now);else if(s==="meta"&&SYNC_META.has(k))enqueue("meta",k,now)}
+async function del(s,k){await rawDel(s,k);if(s==="cats"||s==="log"||s==="photos")enqueue(s,k,Date.now())}
 function getAllPhotos(){return new Promise((res,rej)=>{const t=idb.transaction("photos","readonly"),st=t.objectStore("photos"),out={};const r=st.openCursor();r.onsuccess=()=>{const c=r.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};r.onerror=()=>rej(r.error)})}
 
 let cats=[],log=[],photos={},photoUrls={},filter="all",editing=null;
@@ -853,8 +880,105 @@ $("importFile").addEventListener("change",async()=>{const f=$("importFile").file
     const ks=Array.isArray(j.courses)?j.courses:[];
     const man=j.manual&&typeof j.manual.text==="string"?{text:j.manual.text,updated:j.manual.updated||""}:{text:"",updated:""};
     await tx(["cats","log","photos","meta"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id);t.objectStore("meta").put(man,"manual");t.objectStore("meta").put(ks,"courses")});
-    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;manual=man;courses=ks;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
+    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;manual=man;courses=ks;sortCats();sortLog();render();toast("Obnoveno ze zálohy");
+    if(session){await enqueueAll(Date.now());scheduleSync(500)}}
   catch(e){toast("Tohle není záloha z aplikace Kočky doma.")}});
+
+/* ---------- sync with Supabase (optional; the app works without it) ---------- */
+const SB={url:"",key:""}; // project URL and publishable (anon) key; empty = sync off
+const syncOn=()=>!!(SB.url&&SB.key);
+const SEP="\u0001";
+let session=null,outbox={},lastPull="",syncing=false,syncTimer=null,lastSyncOk=null,syncErr="";
+function loadSession(){try{session=JSON.parse(localStorage.getItem("kocky-session")||"null")}catch(e){session=null}}
+function saveSession(s){session=s;try{s?localStorage.setItem("kocky-session",JSON.stringify(s)):localStorage.removeItem("kocky-session")}catch(e){}}
+const sessFrom=(j,old)=>({access:j.access_token,refresh:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000,uid:(j.user&&j.user.id)||(old&&old.uid),email:(j.user&&j.user.email)||(old&&old.email)});
+async function authCall(grant,body){
+  const r=await fetch(SB.url+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.key,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error_description||j.msg||j.message||("HTTP "+r.status));e.auth=true;throw e}return j}
+async function accessToken(){if(!session)throw Object.assign(new Error("nepřihlášeno"),{auth:true});
+  if(Date.now()>session.exp-60000)saveSession(sessFrom(await authCall("refresh_token",{refresh_token:session.refresh}),session));
+  return session.access}
+async function sb(path,opts){opts=opts||{};
+  const go=async()=>fetch(SB.url+path,Object.assign({},opts,{headers:Object.assign({apikey:SB.key,Authorization:"Bearer "+await accessToken()},opts.headers||{})}));
+  let r=await go();if(r.status===401&&session){session.exp=0;r=await go()}
+  if(!r.ok){const t=await r.text().catch(()=>"");throw new Error("server "+r.status+(t?": "+t.slice(0,140):""))}return r}
+function enqueue(kind,id,m){if(!syncOn()||!session||id==null)return;outbox[kind+SEP+id]=m||Date.now();rawPut("meta",outbox,"outbox").catch(()=>{});scheduleSync(1500)}
+function enqueueAll(t){
+  for(const c of cats)outbox["cats"+SEP+c.id]=t||c._m||0;
+  for(const e of log)outbox["log"+SEP+e.id]=t||e._m||Date.parse(e.at)||0;
+  if(manual.text)outbox["meta"+SEP+"manual"]=t||Date.parse(manual.updated)||0;
+  if(courses.length)outbox["meta"+SEP+"courses"]=t||0;
+  for(const id in photos)outbox["photos"+SEP+id]=t||0;
+  return rawPut("meta",outbox,"outbox")}
+async function pushOutbox(){
+  const snap=Object.assign({},outbox),keys=Object.keys(snap);if(!keys.length)return;
+  const done=k=>{if(outbox[k]===snap[k])delete outbox[k]};
+  for(const key of keys.filter(k=>k.startsWith("photos"+SEP))){const id=key.split(SEP)[1],b=photos[id];
+    if(b)await sb("/storage/v1/object/photos/"+encodeURIComponent(id)+".jpg",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg","x-upsert":"true"},body:b});
+    else await sb("/storage/v1/object/photos/"+encodeURIComponent(id)+".jpg",{method:"DELETE"}).catch(()=>{});
+    done(key)}
+  const rest=keys.filter(k=>!k.startsWith("photos"+SEP)),items=[];
+  for(const key of rest){const[kind,id]=key.split(SEP);let data=null;
+    if(kind==="cats")data=cats.find(c=>c.id===id)||null;else if(kind==="log")data=log.find(e=>e.id===id)||null;
+    else if(kind==="meta")data=id==="manual"?manual:id==="courses"?{list:courses}:null;
+    items.push({kind,id,data,deleted:!data,modified:snap[key]})}
+  for(let i=0;i<items.length;i+=200)await sb("/rest/v1/rpc/put_items",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:items.slice(i,i+200)})});
+  rest.forEach(done);await rawPut("meta",outbox,"outbox")}
+async function applyRemote(r){
+  if(r.kind==="cats"||r.kind==="log"){const arr=r.kind==="cats"?cats:log,i=arr.findIndex(x=>x.id===r.id);
+    if(r.deleted||!r.data){if(i<0)return false;await rawDel(r.kind,r.id);arr.splice(i,1);return true}
+    if(i>=0&&JSON.stringify(arr[i])===JSON.stringify(r.data))return false;
+    await rawPut(r.kind,r.data);if(i>=0)arr[i]=r.data;else arr.push(r.data);return true}
+  if(r.kind==="meta"&&r.data&&!r.deleted){
+    if(r.id==="manual"&&typeof r.data.text==="string"&&r.data.text!==manual.text){manual=r.data;await rawPut("meta",manual,"manual");return true}
+    if(r.id==="courses"&&Array.isArray(r.data.list)&&JSON.stringify(r.data.list)!==JSON.stringify(courses)){courses=r.data.list;await rawPut("meta",courses,"courses");return true}}
+  return false}
+async function pull(){let changed=false,since=lastPull;
+  for(;;){const rows=await(await sb("/rest/v1/items?select=kind,id,data,deleted,updated_at&order=updated_at.asc&limit=500"+(since?"&updated_at=gt."+encodeURIComponent(since):""))).json();
+    for(const r of rows){if(outbox[r.kind+SEP+r.id])continue;if(await applyRemote(r))changed=true}
+    if(rows.length)since=rows[rows.length-1].updated_at;if(rows.length<500)break}
+  // re-read the last 2 minutes next time, so a change saved at the same moment is never skipped
+  if(since){lastPull=new Date(Date.parse(since)-120000).toISOString();await rawPut("meta",lastPull,"lastPull")}
+  return changed}
+async function fetchPhotos(){let got=false;for(const c of cats){if(c.photo&&!photos[c.photo]){
+  try{const b=await(await sb("/storage/v1/object/authenticated/photos/"+encodeURIComponent(c.photo)+".jpg")).blob();await rawPut("photos",b,c.photo);photos[c.photo]=b;got=true}catch(e){}}}return got}
+async function syncNow(){
+  if(!syncOn()||!session||syncing)return;
+  if(navigator.onLine===false){syncErr="offline";renderSync();return}
+  syncing=true;renderSync();
+  try{await pushOutbox();const ch=await pull();const ph=await fetchPhotos();
+    if(ch||ph){sortCats();sortLog();render()}lastSyncOk=new Date();syncErr=""}
+  catch(e){syncErr=e&&e.auth?"auth":(e&&e.message)||"chyba";if(syncErr==="auth"){saveSession(null)}}
+  finally{syncing=false;renderSync()}}
+function scheduleSync(ms){if(!syncOn()||!session)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,ms)}
+function renderSync(){
+  const box=$("syncBox"),pill=$("syncPill");box.hidden=!syncOn();if(!syncOn()){pill.hidden=true;return}
+  $("syncLogin").hidden=!!session;$("syncIn").hidden=!session;
+  const pending=Object.keys(outbox).length;let txt,cls="";
+  if(!session){txt=syncErr==="auth"?"Odhlášeno, přihlaste se znovu":"Jen v tomto telefonu";cls=syncErr==="auth"?"err":""}
+  else if(syncing){txt="Synchronizuji…"}
+  else if(syncErr==="offline"){txt="Offline, odešle se později"+(pending?" ("+pending+")":"");cls="err"}
+  else if(syncErr){txt="Synchronizace selhala";cls="err"}
+  else if(lastSyncOk){txt="Sdíleno · "+(pending?"čeká "+pending:"aktuální");cls=pending?"":"ok"}
+  else txt="Sdílení zapnuto";
+  pill.hidden=false;pill.textContent=txt;pill.className="sync-pill "+cls;
+  if(session){$("sWho").textContent="Přihlášen(a): "+(session.email||"");
+    $("sState").textContent=syncing?"Synchronizuji…":syncErr&&syncErr!=="offline"?"Chyba: "+syncErr:syncErr==="offline"?"Bez internetu. Změny se odešlou, až bude připojení.":lastSyncOk?"Naposledy synchronizováno "+hm(lastSyncOk)+(pending?", čeká na odeslání: "+pending:""):"Ještě nesynchronizováno"}}
+$("syncLogin").addEventListener("submit",async ev=>{ev.preventDefault();const err=$("sLoginErr");err.hidden=true;$("sLoginBtn").disabled=true;
+  try{const j=await authCall("password",{email:$("sEmail").value.trim(),password:$("sPass").value});saveSession(sessFrom(j));$("sPass").value="";syncErr="";
+    // first sign-in on this phone: send everything it has; older or untouched items never overwrite newer ones on the server
+    const flag="kocky-synced-"+session.uid;let first=true;try{first=localStorage.getItem(flag)!=="1"}catch(e){}
+    if(first){await enqueueAll(null);try{localStorage.setItem(flag,"1")}catch(e){}}
+    renderSync();await syncNow();toast("Přihlášeno, data se sdílejí")}
+  catch(e){err.textContent=/invalid/i.test(e.message)?"Špatný e-mail nebo heslo.":"Přihlášení se nepovedlo: "+e.message;err.hidden=false}
+  finally{$("sLoginBtn").disabled=false}});
+$("sNow").onclick=()=>syncNow();
+$("sOut").onclick=async()=>{const b=$("sOut");if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu odhlásit?";setTimeout(()=>{delete b.dataset.arm;b.textContent="Odhlásit"},4000);return}
+  try{await sb("/auth/v1/logout",{method:"POST"})}catch(e){}saveSession(null);lastSyncOk=null;syncErr="";renderSync();toast("Odhlášeno. Data zůstala v telefonu.")};
+function initSync(){if(!syncOn())return;loadSession();renderSync();if(session)syncNow();
+  setInterval(()=>{if(!document.hidden)syncNow()},60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncNow()});
+  window.addEventListener("online",()=>syncNow())}
 
 /* ---------- start ---------- */
 async function start(){
@@ -863,9 +987,13 @@ async function start(){
   catch(e){showStatus("Data se nepodařilo načíst ("+(e&&e.message)+"). Zavřete aplikaci a otevřete ji znovu. Nic není smazané.");return}
   try{const m=await tx("meta","readonly",t=>t.objectStore("meta").get("manual"));if(m&&typeof m.text==="string")manual=m}catch(e){}
   try{const k=await tx("meta","readonly",t=>t.objectStore("meta").get("courses"));if(Array.isArray(k))courses=k}catch(e){}
-  if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await put("cats",c);cats.push(c)}setFlag()}
-  const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await put("cats",her)}
+  // seeds are written raw (no edit time), so they never overwrite real data from another phone
+  if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await rawPut("cats",c);cats.push(c)}setFlag()}
+  const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await rawPut("cats",her)}
+  try{const o=await tx("meta","readonly",t=>t.objectStore("meta").get("outbox"));if(o&&typeof o==="object")outbox=o;
+    const lp=await tx("meta","readonly",t=>t.objectStore("meta").get("lastPull"));if(typeof lp==="string")lastPull=lp}catch(e){}
   sortCats();sortLog();render();
+  initSync();
   if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist()}catch(e){}}
 }
 function localFlag(){try{return localStorage.getItem("kocky-seeded")==="1"}catch(e){return false}}
