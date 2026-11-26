@@ -205,7 +205,7 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
     </div>
   </section>
 
-  <section class="cats" id="cats" aria-label="Kočky"></section>
+  <section class="cats" id="cats" aria-label="Kočky"><p class="sub">Načítám kočky…</p></section>
 
   <div id="potty"></div>
 
@@ -367,7 +367,12 @@ function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open("kocky-d
   r.onupgradeneeded=()=>{const d=r.result,has=n=>d.objectStoreNames.contains(n);
     if(!has("cats"))d.createObjectStore("cats",{keyPath:"id"});if(!has("log"))d.createObjectStore("log",{keyPath:"id"});
     if(!has("photos"))d.createObjectStore("photos");if(!has("meta"))d.createObjectStore("meta")};
-  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+  // an older copy of the app open elsewhere can block the upgrade: tell the user instead of waiting silently
+  r.onblocked=()=>showStatus("Aplikace je otevřená ještě jinde (v jiném okně nebo v Chrome). Zavřete ji všude, i v přehledu spuštěných aplikací, a otevřete ji znovu. Data jsou v pořádku.");
+  r.onsuccess=()=>{const d=r.result;d.onversionchange=()=>{d.close();showStatus("Aplikace se aktualizovala, načítám znovu…");setTimeout(()=>location.reload(),300)};showStatus("");res(d)};
+  r.onerror=()=>rej(r.error)})}
+window.addEventListener("error",e=>showStatus("Něco se pokazilo: "+(e.message||"neznámá chyba")+". Zkuste aplikaci zavřít a otevřít znovu. Data jsou uložená."));
+window.addEventListener("unhandledrejection",e=>showStatus("Něco se pokazilo: "+((e.reason&&e.reason.message)||e.reason||"neznámá chyba")+". Zkuste aplikaci zavřít a otevřít znovu. Data jsou uložená."));
 function tx(store,mode,fn){return new Promise((res,rej)=>{const t=idb.transaction(store,mode);const out=fn(t);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})}
 const getAll=s=>tx(s,"readonly",t=>t.objectStore(s).getAll());
 const put=(s,v,k)=>tx(s,"readwrite",t=>{k===undefined?t.objectStore(s).put(v):t.objectStore(s).put(v,k)});
@@ -399,7 +404,9 @@ function render(){
   let best=null;for(const c of cats)for(const[k,label]of CARE){const s=careStatus(c.care&&c.care[k]);if(s.days!=null&&(!best||s.days<best.s.days))best={c,label,s}}
   if(best){$("nextCare").textContent=best.label+" · "+best.c.name;$("nextCareHint").textContent=best.s.days<0?"Po termínu o "+(-best.s.days)+" d":best.s.days===0?"Dnes":"Za "+best.s.days+" d ("+best.s.due.toLocaleDateString("cs-CZ")+")"}
   else{$("nextCare").textContent="–";$("nextCareHint").textContent="Doplňte u koček datum očkování a odčervení (Upravit)."}
-  renderAlerts();renderCats();renderPotty();renderManual();renderJournal();
+  // each part draws on its own, so a fault in one never hides the cats
+  for(const [name,fn] of [["upozornění",renderAlerts],["kočky",renderCats],["kalendář",renderPotty],["mňaunuál",renderManual],["deník",renderJournal]]){
+    try{fn()}catch(e){console.error(e);showStatus("Část „"+name+"“ se nepodařilo zobrazit ("+(e&&e.message)+"). Data jsou uložená.")}}
 }
 
 /* ---------- health alerts ---------- */
@@ -754,7 +761,8 @@ $("importFile").addEventListener("change",async()=>{const f=$("importFile").file
 /* ---------- start ---------- */
 async function start(){
   try{idb=await openDb()}catch(e){showStatus("Prohlížeč nedovolil ukládat data (anonymní okno?). Otevřete aplikaci v běžném okně.");render();return}
-  [cats,log,photos]=await Promise.all([getAll("cats"),getAll("log"),getAllPhotos()]);
+  try{[cats,log,photos]=await Promise.all([getAll("cats"),getAll("log"),getAllPhotos()])}
+  catch(e){showStatus("Data se nepodařilo načíst ("+(e&&e.message)+"). Zavřete aplikaci a otevřete ji znovu. Nic není smazané.");return}
   try{const m=await tx("meta","readonly",t=>t.objectStore("meta").get("manual"));if(m&&typeof m.text==="string")manual=m}catch(e){}
   if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await put("cats",c);cats.push(c)}setFlag()}
   const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await put("cats",her)}
