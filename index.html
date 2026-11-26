@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kočky doma</title>
+<meta name="theme-color" content="#1f6f78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kočky">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#1d2a2e; --muted:#5f6e72; --line:#dde4e3;
+  --accent:#1f6f78; --accent-ink:#ffffff; --accent-soft:#dcefee;
+  --ok:#2e7d4f; --ok-soft:#e1f2e7; --warn:#a76400; --warn-soft:#fbeed6; --bad:#b3362c; --bad-soft:#f8e1de;
+  --display:ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#131a1c; --surface:#1b2427; --ink:#e6eeee; --muted:#9aaaad; --line:#2c393c;
+  --accent:#5cc0c8; --accent-ink:#0d1a1c; --accent-soft:#1d3538;
+  --ok:#6fcf93; --ok-soft:#1c3226; --warn:#f0b25a; --warn-soft:#3a2c15; --bad:#f08a80; --bad-soft:#3d1f1c; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(40px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,6vw,40px);font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:22px;font-weight:700}
+.top{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px}
+.sub{color:var(--muted)}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;font-weight:500;-webkit-tap-highlight-color:transparent}
+button:hover{border-color:var(--accent)}
+button:active{transform:scale(.97)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{border-color:transparent;background:transparent;padding:6px 8px}
+button.small{padding:4px 10px;font-size:13px;border-radius:8px}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+.strip{display:flex;flex-wrap:wrap;gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;flex:1 1 240px;min-width:0}
+.tile .big{font-family:var(--display);font-size:22px;font-weight:700}
+.tile .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.cat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.cat-head{display:flex;gap:12px;align-items:center}
+.cat-head .who{flex:1;min-width:0}
+.cat-head .who .sub{font-size:13px}
+.dot{display:block;width:38px;height:38px;border-radius:50%;flex:none;border:2px solid var(--line);overflow:hidden}
+.cat-head .dot{width:64px;height:64px}
+.dot img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-btn{padding:0;border:0;background:none;border-radius:50%;position:relative;flex:none}
+.avatar-btn .cam{position:absolute;right:-4px;bottom:-2px;background:var(--accent);color:var(--accent-ink);border-radius:999px;font-size:11px;font-weight:600;padding:1px 6px;border:2px solid var(--surface)}
+.avatar-btn.busy{opacity:.5;pointer-events:none}
+.actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.actions button{padding:8px 4px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.actions button b{font-size:18px;line-height:1}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fact{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fact .v{font-weight:600;font-variant-numeric:tabular-nums}
+.spark{width:100%;height:34px;display:block}
+.care{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+.care-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.care-row .n{font-size:14px}
+.care-row .d{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.none{background:var(--bg);color:var(--muted)}
+.journal{display:flex;flex-direction:column;gap:12px}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.filters button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.day{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.day-h{padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--line)}
+.entry{display:grid;grid-template-columns:48px 22px 1fr auto;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line)}
+.entry:last-child{border-bottom:0}
+.entry .t{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.entry .m{min-width:0;overflow-wrap:anywhere}
+.entry .m small{color:var(--muted)}
+.mini{width:16px;height:16px;border-radius:50%;border:1px solid var(--line);display:block;overflow:hidden}
+.mini img{width:100%;height:100%;object-fit:cover;display:block}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:18px;padding:28px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.note{font-size:13px;color:var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:10px}
+.backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:16px}
+.backup .sub{font-size:13px;flex:1 1 220px}
+dialog{border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);padding:0;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px)}
+dialog::backdrop{background:rgb(0 0 0 / .4)}
+dialog form{padding:20px;display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;font-weight:600}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+.two{display:grid;grid-template-columns:1fr 110px;gap:8px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatches label{cursor:pointer}
+.swatches input{position:absolute;opacity:0;width:1px;height:1px}
+.swatches span{display:block;width:30px;height:30px;border-radius:50%;border:2px solid var(--line)}
+.swatches input:checked+span,.swatches input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.photo-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.photo-row .dot{width:56px;height:56px}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.dlg-foot .grow{margin-right:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+.actions.five{grid-template-columns:repeat(5,1fr)}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.cons{display:flex;flex-wrap:wrap;gap:6px}
+.cons button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.entry .m.edit{cursor:pointer;border-radius:6px}
+.entry .m.edit:hover{background:var(--bg)}
+/* potty calendar */
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.cal-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.cal-head .who{display:flex;gap:10px;align-items:center}
+.cal-nav{display:flex;gap:6px;align-items:center}
+.cal-nav .mon{min-width:120px;text-align:center;font-weight:600;text-transform:capitalize}
+.cal-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.cal-tabs button{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px}
+.cal-tabs button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.cal-stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.cal-stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.grid7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.grid7 .wd{font-size:11px;text-align:center;color:var(--muted);font-weight:600;text-transform:uppercase}
+.dayc{aspect-ratio:1/1;max-width:100%;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:2px;position:relative;font-variant-numeric:tabular-nums}
+.dayc .dn{font-size:11px;color:var(--muted);line-height:1}
+.dayc .cnt{font-size:17px;font-weight:700;line-height:1.1}
+.dayc.c0 .cnt{color:var(--muted);font-weight:500;font-size:13px}
+.dayc.c1{background:var(--accent-soft)}
+.dayc.c2{background:color-mix(in srgb,var(--accent) 35%,var(--surface))}
+.dayc.c3{background:color-mix(in srgb,var(--accent) 60%,var(--surface))}
+.dayc.today{border:2px solid var(--accent)}
+.dayc.sel{outline:3px solid var(--ink);outline-offset:1px}
+.dayc.future{opacity:.35}
+.dayc .flag{position:absolute;top:3px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--bad)}
+.dayc .flag.w{background:var(--warn)}
+.daydetail{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.daydetail .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pitem{display:grid;grid-template-columns:50px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.pitem:last-child{border-bottom:0}
+.pitem .t{font-weight:600;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+[hidden]{display:none!important}
+@media (max-width:420px){.facts{grid-template-columns:1fr}.entry{grid-template-columns:42px 18px 1fr auto;gap:8px}}
+@media (prefers-reduced-motion:reduce){button:active{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="label" id="today"></div>
+      <h1>Kočky doma</h1>
+    </div>
+    <button class="primary" id="addCat">+ Přidat kočku</button>
+  </header>
+
+  <div id="status" class="note" hidden></div>
+
+  <section class="strip" aria-label="Domácnost">
+    <div class="tile">
+      <span class="label">Dnes nakrmeno</span>
+      <div class="big" id="fedToday">–</div>
+      <span class="sub" id="fedHint"></span>
+    </div>
+    <div class="tile">
+      <span class="label">Nejbližší péče</span>
+      <div class="big" id="nextCare">–</div>
+      <span class="sub" id="nextCareHint"></span>
+    </div>
+  </section>
+
+  <section class="cats" id="cats" aria-label="Kočky"></section>
+
+  <div id="potty"></div>
+
+  <section class="journal">
+    <div class="top">
+      <h2>Deník</h2>
+      <div class="filters" id="filters"></div>
+    </div>
+    <div id="journal"></div>
+  </section>
+
+  <section class="backup" aria-label="Záloha">
+    <span class="sub">Vše se ukládá jen v tomto telefonu. Občas si stáhněte zálohu, ať o nic nepřijdete při výměně telefonu.</span>
+    <button id="exportBtn">Stáhnout zálohu</button>
+    <button id="importBtn">Obnovit ze zálohy</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </section>
+</div>
+
+<dialog id="catDlg">
+  <form method="dialog" id="catForm">
+    <h2 id="catDlgTitle">Kočka</h2>
+    <div class="field"><label for="cName">Jméno</label><input id="cName" required maxlength="40"></div>
+    <div class="field"><span class="label">Fotka</span>
+      <div class="photo-row"><div class="dot" id="cPhotoPrev"></div>
+        <button type="button" id="cPhotoBtn">Nahrát fotku</button>
+        <button type="button" class="danger" id="cPhotoDel" hidden>Odebrat</button></div></div>
+    <div class="field"><span class="label">Barva</span><div class="swatches" id="cColor"></div></div>
+    <div class="two">
+      <div class="field"><label for="cBorn">Narozen(a)</label><input id="cBorn" type="date"></div>
+      <div class="field"><label for="cSex">Pohlaví</label><select id="cSex"><option value="f">kočka</option><option value="m">kocour</option></select></div>
+    </div>
+    <label class="check" for="cPotty"><input type="checkbox" id="cPotty"> Sledovat záchod (kadící kalendář)</label>
+    <div class="field"><label for="cChip">Číslo čipu</label><input id="cChip" inputmode="numeric" maxlength="20" placeholder="15 číslic"></div>
+    <div class="label">Poslední péče a interval (dny)</div>
+    <div class="two"><div class="field"><label for="cVac">Očkování</label><input id="cVac" type="date"></div><div class="field"><label for="cVacE">každých</label><input id="cVacE" type="number" inputmode="numeric" min="1" max="1500"></div></div>
+    <div class="two"><div class="field"><label for="cDew">Odčervení</label><input id="cDew" type="date"></div><div class="field"><label for="cDewE">každých</label><input id="cDewE" type="number" inputmode="numeric" min="1" max="1500"></div></div>
+    <div class="two"><div class="field"><label for="cFlea">Odblešení / pipeta</label><input id="cFlea" type="date"></div><div class="field"><label for="cFleaE">každých</label><input id="cFleaE" type="number" inputmode="numeric" min="1" max="1500"></div></div>
+    <div class="field"><label for="cNotes">Poznámky (strava, alergie, veterinář)</label><textarea id="cNotes" rows="2" maxlength="400"></textarea></div>
+    <div class="dlg-foot">
+      <button type="button" class="danger grow" id="cDel" hidden>Smazat</button>
+      <button type="button" id="cCancel">Zrušit</button>
+      <button class="primary" value="save">Uložit</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="entryDlg">
+  <form method="dialog" id="entryForm">
+    <h2 id="eTitle">Záznam</h2>
+    <div class="field"><label for="eAt">Kdy</label><input id="eAt" type="datetime-local" required></div>
+    <div class="field" id="eConsF"><span class="label">Jaké</span><div class="cons" id="eCons"></div></div>
+    <div class="field" id="eWeightF"><label for="eWeight">Váha (kg)</label><input id="eWeight" type="text" inputmode="decimal" autocomplete="off" pattern="\s*\d{1,2}([.,]\d{1,3})?\s*" placeholder="např. 4,5" title="Číslo v kilogramech, např. 4,5"></div>
+    <div class="field"><label for="eNote" id="eNoteL">Poznámka</label><input id="eNote" maxlength="200"></div>
+    <div class="dlg-foot">
+      <button type="button" class="danger grow" id="eDel" hidden>Smazat</button>
+      <button type="button" id="eCancel">Zrušit</button>
+      <button class="primary" value="save" id="eSave">Zapsat</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(function(){
+"use strict";
+const COLORS={zrzava:["#d9823b","zrzavá"],seda:["#8d98a3","šedá"],cerna:["#26262b","černá"],cerna_bila:["linear-gradient(135deg,#26262b 72%,#f1eee9 72%)","černá s trochou bílé"],cernobila:["linear-gradient(135deg,#26262b 50%,#f1eee9 50%)","černobílá"],bila:["#f1eee9","bílá"],mourovata:["#93714c","mourovatá"],kremova:["#e6c89a","krémová"],tribarevna:["linear-gradient(135deg,#f1eee9 33%,#d9823b 33% 66%,#26262b 66%)","tříbarevná"]};
+const CARE=[["vac","Očkování",365],["dew","Odčervení",90],["flea","Odblešení",30]];
+const TYPES={food:["🍽","Krmení"],poop:["💩","Kadění"],weight:["⚖","Váha"],meds:["💊","Léky"],note:["✎","Poznámka"],litter:["🧹","Záchod uklizen"],care:["✓","Péče"]};
+const CONS={normal:["normální",""],mekke:["měkké","w"],tvrde:["tvrdé","w"],prujem:["průjem","b"]};
+const SEED=[{id:"oskar",name:"Oskar",color:"cerna",sex:"m",order:1},{id:"felix",name:"Felix",color:"cerna_bila",sex:"m",order:2},{id:"herman",name:"Heřman",color:"cernobila",sex:"m",order:3,potty:true}];
+const toLocalInput=d=>ymd(d)+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
+const poopsOn=(catId,dayKey)=>log.filter(e=>e.type==="poop"&&e.cat===catId&&ymd(new Date(e.at))===dayKey).sort((a,b)=>a.at<b.at?-1:1);
+let calMonth={},calSel={},potCat=null;
+const $=id=>document.getElementById(id);
+function h(tag,attrs,...kids){const e=document.createElement(tag);for(const k in attrs||{}){const v=attrs[k];if(v==null||v===false)continue;if(k==="class")e.className=v;else if(k==="text")e.textContent=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?"":v)}for(const c of kids.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)))}return e}
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parseYmd=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
+const DAY=864e5;
+const startToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+function plural(n,a,b,c){return n===1?a:(n>=2&&n<=4?b:c)}
+function age(born){const b=parseYmd(born);if(!b)return"";const n=new Date();let m=(n.getFullYear()-b.getFullYear())*12+n.getMonth()-b.getMonth();if(n.getDate()<b.getDate())m--;if(m<0)return"";if(m<12)return m+" "+plural(m,"měsíc","měsíce","měsíců");const y=Math.floor(m/12);return y+" "+plural(y,"rok","roky","let")}
+function hm(d){return d.getHours()+":"+pad(d.getMinutes())}
+function ago(iso){if(!iso)return"–";const d=new Date(iso),s=(Date.now()-d)/1000;if(s<60)return"právě teď";if(s<3600)return"před "+Math.floor(s/60)+" min";const t=startToday();if(d>=t)return"před "+Math.floor(s/3600)+" h";if(d>=t-DAY)return"včera "+hm(d);return d.toLocaleDateString("cs-CZ",{day:"numeric",month:"numeric"})+" "+hm(d)}
+function fmtDate(s){const d=parseYmd(s);return d?d.toLocaleDateString("cs-CZ",{day:"numeric",month:"numeric",year:"numeric"}):""}
+const kg=v=>v.toFixed(2).replace(".",",")+" kg";
+function careStatus(c){if(!c||!c.last)return{cls:"none",text:"nezadáno",days:null};const due=new Date(parseYmd(c.last).getTime()+(c.every||30)*DAY);const days=Math.round((due-startToday())/DAY);
+  if(days<0)return{cls:"bad",text:"po termínu "+(-days)+" d",days,due};if(days===0)return{cls:"warn",text:"dnes",days,due};if(days<=7)return{cls:"warn",text:"za "+days+" d",days,due};return{cls:"ok",text:"za "+days+" d",days,due}}
+let toastT;function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+function showStatus(t){const s=$("status");s.textContent=t||"";s.hidden=!t}
+
+/* ---------- storage: IndexedDB in this browser ---------- */
+let idb=null;
+function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open("kocky-doma",1);
+  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("cats",{keyPath:"id"});d.createObjectStore("log",{keyPath:"id"});d.createObjectStore("photos")};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function tx(store,mode,fn){return new Promise((res,rej)=>{const t=idb.transaction(store,mode);const out=fn(t);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})}
+const getAll=s=>tx(s,"readonly",t=>t.objectStore(s).getAll());
+const put=(s,v,k)=>tx(s,"readwrite",t=>{k===undefined?t.objectStore(s).put(v):t.objectStore(s).put(v,k)});
+const del=(s,k)=>tx(s,"readwrite",t=>{t.objectStore(s).delete(k)});
+function getAllPhotos(){return new Promise((res,rej)=>{const t=idb.transaction("photos","readonly"),st=t.objectStore("photos"),out={};const r=st.openCursor();r.onsuccess=()=>{const c=r.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};r.onerror=()=>rej(r.error)})}
+
+let cats=[],log=[],photos={},photoUrls={},filter="all",editing=null;
+function sortCats(){cats.sort((a,b)=>(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,"cs"))}
+function sortLog(){log.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0)}
+function photoUrl(c){const id=c&&c.photo;if(!id||!photos[id])return null;if(!photoUrls[id])photoUrls[id]=URL.createObjectURL(photos[id]);return photoUrls[id]}
+const catById=id=>cats.find(c=>c.id===id);
+
+async function saveCat(c){await put("cats",c);const i=cats.findIndex(x=>x.id===c.id);if(i>=0)cats[i]=c;else cats.push(c);sortCats();render()}
+async function addEntry(cat,type,extra){
+  const e=Object.assign({id:uid(),cat:cat||null,type,at:new Date().toISOString()},extra||{});
+  try{await put("log",e);log.unshift(e);sortLog();render();toast(type==="food"?(catById(cat)||{}).name+": nakrmen(a)":type==="poop"?(catById(cat)||{}).name+": zapsáno kadění":"Zapsáno")}
+  catch(err){toast("Zápis se nepovedl: telefon možná nemá místo.")}
+}
+
+/* ---------- render ---------- */
+function avatar(c,cls){const d=h("span",{class:cls||"dot"});const u=photoUrl(c);if(u)d.append(h("img",{src:u,alt:""}));else d.style.background=(COLORS[c.color]||COLORS.seda)[0];return d}
+
+function render(){
+  $("today").textContent=new Date().toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long"});
+  const t0=startToday().toISOString();
+  const fed=cats.map(c=>log.filter(e=>e.type==="food"&&e.cat===c.id&&e.at>=t0).length);
+  $("fedToday").textContent=cats.length?fed.reduce((a,b)=>a+b,0)+"×":"–";
+  $("fedHint").textContent=cats.length?cats.map((c,i)=>c.name+" "+fed[i]+"×").join(" · "):"";
+  let best=null;for(const c of cats)for(const[k,label]of CARE){const s=careStatus(c.care&&c.care[k]);if(s.days!=null&&(!best||s.days<best.s.days))best={c,label,s}}
+  if(best){$("nextCare").textContent=best.label+" · "+best.c.name;$("nextCareHint").textContent=best.s.days<0?"Po termínu o "+(-best.s.days)+" d":best.s.days===0?"Dnes":"Za "+best.s.days+" d ("+best.s.due.toLocaleDateString("cs-CZ")+")"}
+  else{$("nextCare").textContent="–";$("nextCareHint").textContent="Doplňte u koček datum očkování a odčervení (Upravit)."}
+  renderCats();renderPotty();renderJournal();
+}
+
+function renderPotty(){
+  const box=$("potty");box.replaceChildren();
+  const today=startToday(),todayKey=ymd(today);
+  const list=cats.filter(c=>c.potty!==false);if(!list.length)return;
+  if(!list.some(c=>c.id===potCat))potCat=(list.find(c=>c.id==="herman")||list[0]).id;
+  {const c=catById(potCat);
+    if(!calMonth[c.id])calMonth[c.id]=new Date(today.getFullYear(),today.getMonth(),1);
+    if(!calSel[c.id])calSel[c.id]=todayKey;
+    const m=calMonth[c.id],sel=calSel[c.id];
+    const all=log.filter(e=>e.type==="poop"&&e.cat===c.id);
+    const byDay={};for(const e of all){const k=ymd(new Date(e.at));(byDay[k]=byDay[k]||[]).push(e)}
+    // stats: last 7 days incl. today
+    let tot7=0,zero7=0;for(let i=0;i<7;i++){const k=ymd(new Date(today.getTime()-i*DAY));const n=(byDay[k]||[]).length;tot7+=n;if(!n&&i>0)zero7++}
+    const last=all[0];
+    const nav=(d)=>()=>{calMonth[c.id]=new Date(m.getFullYear(),m.getMonth()+d,1);renderPotty()};
+    const isCurMonth=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
+    const grid=h("div",{class:"grid7"},["Po","Út","St","Čt","Pá","So","Ne"].map(w=>h("span",{class:"wd",text:w})));
+    const lead=(m.getDay()+6)%7;for(let i=0;i<lead;i++)grid.append(h("span"));
+    const dim=new Date(m.getFullYear(),m.getMonth()+1,0).getDate();
+    for(let d=1;d<=dim;d++){
+      const dt=new Date(m.getFullYear(),m.getMonth(),d),k=ymd(dt),items=byDay[k]||[],n=items.length,future=dt>today;
+      const worst=items.reduce((a,e)=>{const s=(CONS[e.cons]||["",""])[1];return s==="b"?"b":(a==="b"?a:(s||a))},"");
+      const cell=h("button",{type:"button",class:"dayc c"+Math.min(n,3)+(k===todayKey?" today":"")+(k===sel?" sel":"")+(future?" future":""),disabled:future,
+        "aria-label":dt.toLocaleDateString("cs-CZ",{day:"numeric",month:"long"})+": "+n+"×",onclick:()=>{calSel[c.id]=k;renderPotty()}},
+        h("span",{class:"dn",text:d}),h("span",{class:"cnt",text:future?"":n?n+"×":"0"}),worst?h("span",{class:"flag"+(worst==="w"?" w":"")}):null);
+      grid.append(cell);
+    }
+    // day detail
+    const sd=parseYmd(sel),items=(byDay[sel]||[]).slice().sort((a,b)=>a.at<b.at?-1:1);
+    const selLabel=sel===todayKey?"Dnes":sel===ymd(new Date(today.getTime()-DAY))?"Včera":sd.toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"numeric"});
+    const addBtn=h("button",{class:"primary small",onclick:()=>{const at=sel===todayKey?new Date():new Date(sd.getFullYear(),sd.getMonth(),sd.getDate(),12,0);openEntry(c,"poop",null,at)},text:"+ Přidat"});
+    const detail=h("div",{class:"daydetail"},
+      h("div",{class:"row"},h("strong",{text:selLabel+" · "+items.length+"×"}),addBtn),
+      items.length?h("div",null,items.map(e=>{const cs=CONS[e.cons];return h("div",{class:"pitem"},h("span",{class:"t",text:hm(new Date(e.at))}),
+        h("span",null,cs?h("span",{class:"chip "+(cs[1]==="b"?"bad":cs[1]==="w"?"warn":"ok"),text:cs[0]}):null,e.note?h("small",{class:"sub",text:" "+e.note}):null),
+        h("button",{class:"small",onclick:()=>openEntry(c,"poop",e),text:"Upravit"}))})):h("p",{class:"sub",style:"margin:0",text:"Tento den nic nezapsáno."}));
+    box.append(h("section",{class:"cal","aria-label":"Kadící kalendář "+c.name},
+      h("div",{class:"cal-head"},h("h2",{text:"Kadící kalendář"}),
+        h("div",{class:"cal-nav"},h("button",{class:"small","aria-label":"Předchozí měsíc",onclick:nav(-1),text:"‹"}),h("span",{class:"mon",text:m.toLocaleDateString("cs-CZ",{month:"long",year:"numeric"})}),h("button",{class:"small","aria-label":"Další měsíc",onclick:nav(1),disabled:isCurMonth,text:"›"}))),
+      h("div",{class:"cal-tabs",role:"group","aria-label":"Kočka"},list.map(x=>h("button",{type:"button","aria-pressed":String(x.id===c.id),onclick:()=>{potCat=x.id;renderPotty()}},avatar(x,"mini"),x.name))),
+      h("div",{class:"cal-stats"},h("span",null,"Dnes ",h("b",{text:((byDay[todayKey]||[]).length)+"×"})),h("span",null,"Naposledy ",h("b",{text:last?ago(last.at):"–"})),
+        h("span",null,"Za 7 dní ",h("b",{text:tot7+"×"})," (průměr "+(tot7/7).toFixed(1).replace(".",",")+"/den)"),zero7?h("span",null,"Dny bez kadění: ",h("b",{text:String(zero7)})):null),
+      grid,
+      h("div",{class:"legend"},h("span",null,h("i",{style:"background:var(--warn)"}),"měkké / tvrdé"),h("span",null,h("i",{style:"background:var(--bad)"}),"průjem")),
+      detail));
+  }
+}
+
+function sparkline(points){
+  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");svg.setAttribute("class","spark");svg.setAttribute("viewBox","0 0 200 34");svg.setAttribute("preserveAspectRatio","none");
+  const vs=points.map(p=>p.value),mn=Math.min(...vs),mx=Math.max(...vs),r=(mx-mn)||1;
+  const xy=points.map((p,i)=>[4+i*(192/(points.length-1)),4+(1-(p.value-mn)/r)*26]);
+  const mk=(n,a)=>{const e=document.createElementNS(ns,n);for(const k in a)e.setAttribute(k,a[k]);return e};
+  svg.append(mk("polygon",{points:"4,34 "+xy.map(p=>p.join(",")).join(" ")+" 196,34",fill:"var(--accent-soft)"}),
+    mk("polyline",{points:xy.map(p=>p.join(",")).join(" "),fill:"none",stroke:"var(--accent)","stroke-width":"2","vector-effect":"non-scaling-stroke","stroke-linejoin":"round"}),
+    mk("circle",{cx:xy[xy.length-1][0],cy:xy[xy.length-1][1],r:"3",fill:"var(--accent)"}));
+  return svg;
+}
+
+function renderCats(){
+  const box=$("cats");box.replaceChildren();
+  if(!cats.length){box.append(h("div",{class:"empty"},h("h2",{text:"Zatím tu není žádná kočka"}),h("p",{class:"sub",text:"Přidejte kočku a dostane kartu s krmením, váhou a termíny péče."}),h("button",{class:"primary",onclick:()=>openCat(null),text:"+ Přidat kočku"})));return}
+  const t0=startToday().toISOString();
+  for(const c of cats){
+    const mine=log.filter(e=>e.cat===c.id);
+    const lastFood=mine.find(e=>e.type==="food");
+    const todayN=mine.filter(e=>e.type==="food"&&e.at>=t0).length;
+    const weights=mine.filter(e=>e.type==="weight"&&typeof e.value==="number").slice(0,12).reverse();
+    const lastW=weights[weights.length-1];
+    const hasP=!!photoUrl(c);
+    const av=h("button",{type:"button",class:"avatar-btn","aria-label":(hasP?"Změnit fotku: ":"Nahrát fotku: ")+c.name,onclick:ev=>pickPhoto(c,ev.currentTarget)},avatar(c),hasP?null:h("span",{class:"cam",text:"+ foto"}));
+    const sub=[c.sex==="m"?"kocour":"kočka",(COLORS[c.color]||COLORS.seda)[1],age(c.born)].filter(Boolean).join(" · ");
+    box.append(h("article",{class:"cat"},
+      h("div",{class:"cat-head"},av,h("div",{class:"who"},h("h3",{text:c.name}),h("div",{class:"sub",text:sub})),h("button",{class:"ghost","aria-label":"Upravit "+c.name,onclick:()=>openCat(c),text:"Upravit"})),
+      h("div",{class:"actions"+(c.potty!==false?" five":"")},
+        h("button",{onclick:()=>addEntry(c.id,"food")},h("b",{text:"🍽"}),"Krmení"),
+        c.potty!==false?h("button",{onclick:()=>openEntry(c,"poop",null,new Date())},h("b",{text:"💩"}),"Kadění"):null,
+        h("button",{onclick:()=>openEntry(c,"weight")},h("b",{text:"⚖"}),"Váha"),
+        h("button",{onclick:()=>openEntry(c,"meds")},h("b",{text:"💊"}),"Léky"),
+        h("button",{onclick:()=>openEntry(c,"note")},h("b",{text:"✎"}),"Poznámka")),
+      h("div",{class:"facts"},
+        h("div",{class:"fact"},h("span",{class:"label",text:"Naposledy jedl(a)"}),h("span",{class:"v",text:lastFood?ago(lastFood.at):"–"}),h("span",{class:"sub",text:"dnes "+todayN+"×"})),
+        h("div",{class:"fact"},h("span",{class:"label",text:"Váha"}),h("span",{class:"v",text:lastW?kg(lastW.value):"–"}),weights.length>1?sparkline(weights):h("span",{class:"sub",text:"zapište vážení"}))),
+      h("div",{class:"care"},CARE.map(([k,label])=>{const cc=c.care&&c.care[k];const s=careStatus(cc);
+        return h("div",{class:"care-row"},h("div",null,h("div",{class:"n",text:label}),h("div",{class:"d",text:cc&&cc.last?"naposledy "+fmtDate(cc.last):"datum nezadáno"})),h("span",{class:"chip "+s.cls,text:s.text}),h("button",{class:"small","aria-label":label+" dnes hotovo",onclick:()=>careDone(c,k,label),text:"Hotovo"}))})),
+      c.notes?h("p",{class:"sub",style:"margin:0;font-size:13px",text:c.notes}):null));
+  }
+}
+
+function renderJournal(){
+  const f=$("filters");f.replaceChildren();
+  const mk=(id,label,sw)=>h("button",{class:"small","aria-pressed":String(filter===id),onclick:()=>{filter=id;renderJournal()}},sw||null,sw?" ":null,label);
+  f.append(mk("all","Vše"));cats.forEach(c=>f.append(mk(c.id,c.name)));
+  const list=log.filter(e=>e.type!=="litter"&&(filter==="all"||e.cat===filter)).slice(0,150);
+  const box=$("journal");box.replaceChildren();
+  if(!list.length){box.append(h("p",{class:"sub",text:"Zatím žádné záznamy. Zapište první krmení tlačítkem „Krmení“ u kočky."}));return}
+  let curDay=null,dayEl=null;const t0=startToday();
+  for(const e of list){
+    const d=new Date(e.at),key=ymd(d);
+    if(key!==curDay){curDay=key;const dd=new Date(d);dd.setHours(0,0,0,0);const lbl=dd.getTime()===t0.getTime()?"Dnes":dd.getTime()===t0-DAY?"Včera":d.toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"numeric"});
+      dayEl=h("div",{class:"day"},h("div",{class:"day-h label",text:lbl}));box.append(dayEl)}
+    const c=catById(e.cat),ty=TYPES[e.type]||TYPES.note;
+    let what=ty[1];if(e.type==="weight"&&typeof e.value==="number")what+=" "+kg(e.value);if(e.type==="care"&&e.note)what=e.note+" hotovo";if(e.type==="poop"&&CONS[e.cons])what+=" ("+CONS[e.cons][0]+")";
+    const delBtn=h("button",{class:"ghost small","aria-label":"Smazat záznam",text:"×"});
+    delBtn.addEventListener("click",async()=>{if(delBtn.dataset.arm){await del("log",e.id);log=log.filter(x=>x.id!==e.id);render();toast("Záznam smazán")}else{delBtn.dataset.arm="1";delBtn.textContent="Smazat?";setTimeout(()=>{if(delBtn.isConnected){delete delBtn.dataset.arm;delBtn.textContent="×"}},3000)}});
+    dayEl.append(h("div",{class:"entry"},h("span",{class:"t",text:hm(d)}),c?avatar(c,"mini"):h("span",{text:ty[0],"aria-hidden":"true"}),
+      h("div",{class:"m"+(c?" edit":""),role:c?"button":null,tabindex:c?"0":null,title:c?"Upravit záznam":null,onclick:c?()=>openEntry(c,e.type,e):null,onkeydown:c?(ev=>{if(ev.key==="Enter")openEntry(c,e.type,e)}):null},h("span",null,c?h("strong",{text:c.name+" "}):null,what),e.note&&e.type!=="care"?h("small",{text:" — "+e.note}):null),delBtn));
+  }
+}
+
+async function careDone(c,k,label){
+  const care=JSON.parse(JSON.stringify(c.care||{}));const def=CARE.find(x=>x[0]===k)[2];
+  care[k]={last:ymd(new Date()),every:(care[k]&&care[k].every)||def};
+  await saveCat(Object.assign({},c,{care}));await addEntry(c.id,"care",{note:label});
+}
+
+/* ---------- photos ---------- */
+async function shrink(file){
+  let bmp=null;try{bmp=await createImageBitmap(file)}catch(e){}
+  if(!bmp){const img=new Image();const u=URL.createObjectURL(file);try{await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=u});bmp=img}catch(e){URL.revokeObjectURL(u);throw new Error("format")}}
+  const w=bmp.width||bmp.naturalWidth,hh=bmp.height||bmp.naturalHeight,s=Math.min(1,900/Math.max(w,hh));
+  const cv=document.createElement("canvas");cv.width=Math.round(w*s);cv.height=Math.round(hh*s);cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+  return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error("encode")),"image/jpeg",0.85));
+}
+function pickPhoto(c,btn){if(!c)return;const inp=h("input",{type:"file",accept:"image/*"});inp.addEventListener("change",()=>{const f=inp.files&&inp.files[0];if(f)setPhoto(c,f,btn)});inp.click()}
+async function setPhoto(c,file,btn){
+  if(btn)btn.classList.add("busy");
+  try{const blob=await shrink(file);const id="p"+uid();await put("photos",blob,id);photos[id]=blob;
+    const old=c.photo;const nc=Object.assign({},c,{photo:id});await saveCat(nc);
+    if(old&&old!==id){await del("photos",old).catch(()=>{});dropPhoto(old)}
+    if(editing&&editing.id===c.id){editing=nc;fillPhoto(nc)}
+    toast("Fotka uložena")}
+  catch(e){toast(e&&e.message==="format"?"Tenhle formát fotky neumím, zkuste JPG nebo PNG.":"Fotku se nepodařilo uložit.")}
+  finally{if(btn)btn.classList.remove("busy")}
+}
+function dropPhoto(id){delete photos[id];if(photoUrls[id]){URL.revokeObjectURL(photoUrls[id]);delete photoUrls[id]}}
+function fillPhoto(c){const prev=$("cPhotoPrev");prev.replaceChildren();prev.style.background="";
+  const col=(COLORS[(document.querySelector('input[name="cColor"]:checked')||{}).value]||COLORS.seda)[0];
+  const u=c&&photoUrl(c);if(u)prev.append(h("img",{src:u,alt:""}));else prev.style.background=col;
+  $("cPhotoBtn").hidden=!c;$("cPhotoBtn").textContent=u?"Změnit fotku":"Nahrát fotku";$("cPhotoDel").hidden=!u;
+  if(!c){prev.replaceChildren(h("span",{class:"sub",style:"font-size:11px;display:block;padding:14px 4px;text-align:center",text:"po uložení"}))}}
+
+/* ---------- dialogs ---------- */
+let entryCtx=null,entryCons="normal";
+function renderCons(){const b=$("eCons");b.replaceChildren();for(const k in CONS)b.append(h("button",{type:"button",class:"small","aria-pressed":String(entryCons===k),onclick:()=>{entryCons=entryCons===k?"":k;renderCons()},text:CONS[k][0]}))}
+// existing: entry to edit (or null); at: preset time for a new entry
+function openEntry(c,type,existing,at){entryCtx={c,type,existing};
+  $("eTitle").textContent=c.name+" · "+TYPES[type][1]+(existing?" (úprava)":"");
+  $("eAt").value=toLocalInput(existing?new Date(existing.at):(at||new Date()));
+  $("eWeightF").hidden=type!=="weight";$("eWeight").required=type==="weight";
+  const lastW=existing&&type==="weight"?existing:log.find(e=>e.cat===c.id&&e.type==="weight");$("eWeight").value=lastW&&typeof lastW.value==="number"?String(lastW.value).replace(".",","):"";
+  $("eConsF").hidden=type!=="poop";entryCons=existing?(existing.cons||""):"normal";renderCons();
+  $("eNoteL").textContent=type==="meds"?"Jaký lék a dávka":(type==="weight"||type==="poop"||type==="food"||type==="care")?"Poznámka (nepovinné)":"Poznámka";
+  $("eNote").required=type==="meds"||type==="note";$("eNote").value=existing&&existing.note||"";
+  $("eDel").hidden=!existing;delete $("eDel").dataset.arm;$("eDel").textContent="Smazat";$("eSave").textContent=existing?"Uložit":"Zapsat";
+  $("entryDlg").showModal()}
+$("eCancel").onclick=()=>$("entryDlg").close();
+$("eDel").onclick=async()=>{const b=$("eDel"),e=entryCtx&&entryCtx.existing;if(!e)return;if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu smazat?";return}
+  await del("log",e.id);log=log.filter(x=>x.id!==e.id);render();$("entryDlg").close();toast("Záznam smazán")};
+$("entryForm").addEventListener("submit",async ev=>{ev.preventDefault();if(!entryCtx)return;
+  const atD=new Date($("eAt").value);if(isNaN(atD)){toast("Zadejte datum a čas.");return}
+  const x={at:atD.toISOString()};const n=$("eNote").value.trim();
+  if(entryCtx.type==="weight"){const w=parseFloat(String($("eWeight").value).replace(",","."));if(!(w>0))return;x.value=Math.round(w*100)/100}
+  if(entryCtx.type==="poop")x.cons=entryCons||"";
+  const {c,type,existing}=entryCtx;$("entryDlg").close();
+  if(existing){const e=Object.assign({},existing,x,{note:n});if(!n)delete e.note;
+    try{await put("log",e);log=log.map(y=>y.id===e.id?e:y);sortLog();render();toast("Uloženo")}catch(err){toast("Uložení se nepovedlo.")}}
+  else{if(n)x.note=n;await addEntry(c.id,type,x);
+    if(type==="poop"){const k=ymd(atD);potCat=c.id;calSel[c.id]=k;calMonth[c.id]=new Date(atD.getFullYear(),atD.getMonth(),1);renderPotty()}}});
+
+const sw=$("cColor");Object.entries(COLORS).forEach(([k,[c,l]])=>{const inp=h("input",{type:"radio",name:"cColor",value:k,id:"cColor_"+k,"aria-label":l,onchange:()=>fillPhoto(editing)});const s=h("span",{title:l});s.style.background=c;sw.append(h("label",{for:"cColor_"+k},inp,s))});
+const CMAP={vac:["cVac","cVacE"],dew:["cDew","cDewE"],flea:["cFlea","cFleaE"]};
+function openCat(c){editing=c;$("catDlgTitle").textContent=c?"Upravit: "+c.name:"Nová kočka";
+  $("cName").value=c?c.name:"";$("cBorn").value=c&&c.born||"";$("cSex").value=c&&c.sex||"f";$("cChip").value=c&&c.chip||"";$("cNotes").value=c&&c.notes||"";$("cPotty").checked=!c||c.potty!==false;
+  const r=document.querySelector('input[name="cColor"][value="'+(c&&c.color||"seda")+'"]');if(r)r.checked=true;
+  for(const[k,,def]of CARE){const cc=c&&c.care&&c.care[k];$(CMAP[k][0]).value=cc&&cc.last||"";$(CMAP[k][1]).value=cc&&cc.every||def}
+  fillPhoto(c);const d=$("cDel");d.hidden=!c;delete d.dataset.arm;d.textContent="Smazat";
+  $("catDlg").showModal()}
+$("addCat").onclick=()=>openCat(null);
+$("cCancel").onclick=()=>$("catDlg").close();
+$("cPhotoBtn").onclick=ev=>pickPhoto(editing,ev.currentTarget);
+$("cPhotoDel").onclick=async()=>{const b=$("cPhotoDel");if(!editing||!editing.photo)return;if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu odebrat?";return}
+  delete b.dataset.arm;b.textContent="Odebrat";const old=editing.photo;editing=Object.assign({},editing,{photo:""});await saveCat(editing);await del("photos",old).catch(()=>{});dropPhoto(old);fillPhoto(editing);toast("Fotka odebrána")};
+$("cDel").onclick=async()=>{const b=$("cDel");if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu smazat? Záznamy v deníku zůstanou.";return}
+  const c=editing;await del("cats",c.id);if(c.photo){await del("photos",c.photo).catch(()=>{});dropPhoto(c.photo)}cats=cats.filter(x=>x.id!==c.id);render();toast(c.name+" smazán(a)");$("catDlg").close()};
+$("catForm").addEventListener("submit",async ev=>{ev.preventDefault();const name=$("cName").value.trim();if(!name)return;
+  const care={};for(const[k,,def]of CARE){care[k]={last:$(CMAP[k][0]).value||"",every:parseInt($(CMAP[k][1]).value,10)||def}}
+  const c=Object.assign({},editing||{id:"c"+uid(),order:Date.now()},{name,color:(document.querySelector('input[name="cColor"]:checked')||{}).value||"seda",born:$("cBorn").value||"",sex:$("cSex").value,chip:$("cChip").value.trim(),notes:$("cNotes").value.trim(),care,potty:$("cPotty").checked});
+  try{await saveCat(c);toast("Uloženo");$("catDlg").close()}catch(e){toast("Uložení se nepovedlo.")}});
+
+/* ---------- backup ---------- */
+const b2d=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b)});
+async function d2b(u){return (await fetch(u)).blob()}
+$("exportBtn").onclick=async()=>{
+  try{const ph={};for(const id in photos)ph[id]=await b2d(photos[id]);
+    const data=JSON.stringify({app:"kocky-doma",version:1,exported:new Date().toISOString(),cats,log,photos:ph});
+    const name="kocky-zaloha-"+ymd(new Date())+".json";const file=new File([data],name,{type:"application/json"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==="AbortError")return}}
+    const a=h("a",{href:URL.createObjectURL(file),download:name});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Záloha stažena")}
+  catch(e){toast("Zálohu se nepodařilo vytvořit.")}};
+$("importBtn").onclick=()=>{const b=$("importBtn");if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Přepíše současná data. Vybrat soubor?";setTimeout(()=>{delete b.dataset.arm;b.textContent="Obnovit ze zálohy"},5000);return}
+  delete b.dataset.arm;b.textContent="Obnovit ze zálohy";$("importFile").value="";$("importFile").click()};
+$("importFile").addEventListener("change",async()=>{const f=$("importFile").files[0];if(!f)return;
+  try{const j=JSON.parse(await f.text());if(j.app!=="kocky-doma"||!Array.isArray(j.cats)||!Array.isArray(j.log))throw 0;
+    const ph={};for(const id in j.photos||{}){if(/^data:image\//.test(j.photos[id]))ph[id]=await d2b(j.photos[id])}
+    await tx(["cats","log","photos"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id)});
+    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
+  catch(e){toast("Tohle není záloha z aplikace Kočky doma.")}});
+
+/* ---------- start ---------- */
+async function start(){
+  try{idb=await openDb()}catch(e){showStatus("Prohlížeč nedovolil ukládat data (anonymní okno?). Otevřete aplikaci v běžném okně.");render();return}
+  [cats,log,photos]=await Promise.all([getAll("cats"),getAll("log"),getAllPhotos()]);
+  if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await put("cats",c);cats.push(c)}setFlag()}
+  const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await put("cats",her)}
+  sortCats();sortLog();render();
+  if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist()}catch(e){}}
+}
+function localFlag(){try{return localStorage.getItem("kocky-seeded")==="1"}catch(e){return false}}
+function setFlag(){try{localStorage.setItem("kocky-seeded","1")}catch(e){}}
+start();
+setInterval(render,60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)render()});
+if("serviceWorker" in navigator&&location.protocol==="https:"){navigator.serviceWorker.register("sw.js").catch(()=>{})}
+})();
+</script>
+</body>
+</html>
