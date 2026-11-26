@@ -4,6 +4,10 @@ Malá aplikace na telefon pro Oskara, Felixe a Heřmana. Zapisuje se v ní krmen
 
 Je to statická webová stránka bez serveru a bez účtů. Všechna data i fotky zůstávají jen v prohlížeči telefonu, ve kterém se aplikace používá.
 
+## Mňaunuál
+
+Je to textový návod pro hlídače: krmení, záchod, léky, na co si dát pozor a kontakty. Dá se kdykoli upravit. Tlačítko *Vložit osnovu* doplní kostru textu a *Vložit údaje o kočkách* jejich popis, čip a termíny péče. Tlačítkem *Poslat hlídači* ho pošlete třeba přes WhatsApp, SMS nebo e-mail. Mňaunuál se ukládá i do zálohy.
+
 ## Připomínky
 
 Aplikace nemá server, takže připomínky posílá kalendář v telefonu. V okně **Léky** je tlačítko *⏰ Připomínat v kalendáři*. U očkování, odčervení a odblešení je tlačítko ⏰. Obojí vytvoří předvyplněnou událost v Google Kalendáři, případně soubor .ics pro jiný kalendář, a nastavit jde i opakování.

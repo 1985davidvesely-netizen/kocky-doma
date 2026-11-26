@@ -110,6 +110,12 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
 .dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .dlg-foot .grow{margin-right:auto}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+.manual{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.m-actions{display:flex;flex-wrap:wrap;gap:6px}
+.m-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.6;max-width:70ch}
+.m-text.empty-m{color:var(--muted)}
+.m-edit{display:flex;flex-direction:column;gap:10px}
+.m-edit textarea{min-height:320px;line-height:1.5;resize:vertical}
 .care-row{grid-template-columns:1fr auto auto auto}
 .bell{padding:4px 8px}
 .times{display:flex;flex-wrap:wrap;gap:6px}
@@ -190,6 +196,28 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
   <section class="cats" id="cats" aria-label="Kočky"></section>
 
   <div id="potty"></div>
+
+  <section class="manual" aria-labelledby="mTitle">
+    <div class="cal-head">
+      <div><h2 id="mTitle">Mňaunuál</h2><div class="sub" id="mMeta">Návod pro hlídače</div></div>
+      <div class="m-actions" id="mViewBtns">
+        <button class="small" id="mShare">Poslat hlídači</button>
+        <button class="small" id="mCopy">Kopírovat</button>
+        <button class="small primary" id="mEdit">Upravit</button>
+      </div>
+    </div>
+    <div id="mView" class="m-text"></div>
+    <div id="mEditBox" hidden class="m-edit">
+      <label for="mText" class="label">Text mňaunuálu</label>
+      <textarea id="mText" rows="16" maxlength="20000" placeholder="Jak krmit, kdy dávat léky, na co si dát pozor, kontakty…"></textarea>
+      <div class="dlg-foot">
+        <button type="button" class="grow small" id="mTemplate">Vložit osnovu</button>
+        <button type="button" class="small" id="mCats">Vložit údaje o kočkách</button>
+        <button type="button" id="mCancel">Zrušit</button>
+        <button type="button" class="primary" id="mSave">Uložit</button>
+      </div>
+    </div>
+  </section>
 
   <section class="journal">
     <div class="top">
@@ -309,8 +337,10 @@ function showStatus(t){const s=$("status");s.textContent=t||"";s.hidden=!t}
 
 /* ---------- storage: IndexedDB in this browser ---------- */
 let idb=null;
-function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open("kocky-doma",1);
-  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("cats",{keyPath:"id"});d.createObjectStore("log",{keyPath:"id"});d.createObjectStore("photos")};
+function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open("kocky-doma",2);
+  r.onupgradeneeded=()=>{const d=r.result,has=n=>d.objectStoreNames.contains(n);
+    if(!has("cats"))d.createObjectStore("cats",{keyPath:"id"});if(!has("log"))d.createObjectStore("log",{keyPath:"id"});
+    if(!has("photos"))d.createObjectStore("photos");if(!has("meta"))d.createObjectStore("meta")};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function tx(store,mode,fn){return new Promise((res,rej)=>{const t=idb.transaction(store,mode);const out=fn(t);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})}
 const getAll=s=>tx(s,"readonly",t=>t.objectStore(s).getAll());
@@ -343,8 +373,31 @@ function render(){
   let best=null;for(const c of cats)for(const[k,label]of CARE){const s=careStatus(c.care&&c.care[k]);if(s.days!=null&&(!best||s.days<best.s.days))best={c,label,s}}
   if(best){$("nextCare").textContent=best.label+" · "+best.c.name;$("nextCareHint").textContent=best.s.days<0?"Po termínu o "+(-best.s.days)+" d":best.s.days===0?"Dnes":"Za "+best.s.days+" d ("+best.s.due.toLocaleDateString("cs-CZ")+")"}
   else{$("nextCare").textContent="–";$("nextCareHint").textContent="Doplňte u koček datum očkování a odčervení (Upravit)."}
-  renderCats();renderPotty();renderJournal();
+  renderCats();renderPotty();renderManual();renderJournal();
 }
+
+/* ---------- Mňaunuál ---------- */
+let manual={text:"",updated:""};
+function renderManual(){if(!$("mEditBox").hidden)return;const v=$("mView");const has=!!manual.text.trim();
+  v.textContent=has?manual.text:"Zatím prázdný. Klepněte na Upravit a napište hlídači, jak se o kočky starat: krmení, záchod, léky, na co si dát pozor a kontakty.";
+  v.classList.toggle("empty-m",!has);$("mShare").hidden=!has;$("mCopy").hidden=!has;
+  $("mMeta").textContent=manual.updated?"Návod pro hlídače · upraveno "+new Date(manual.updated).toLocaleDateString("cs-CZ",{day:"numeric",month:"numeric",year:"numeric"}):"Návod pro hlídače"}
+function editManual(on){$("mEditBox").hidden=!on;$("mView").hidden=on;$("mViewBtns").hidden=on;if(on){$("mText").value=manual.text;$("mText").focus()}else renderManual()}
+function insertAtEnd(t){const ta=$("mText");ta.value=(ta.value.trim()?ta.value.replace(/\s+$/,"")+"\n\n":"")+t;ta.focus();ta.scrollTop=ta.scrollHeight}
+const M_TEMPLATE=()=>["MŇAUNUÁL – hlídání: "+cats.map(c=>c.name).join(", "),"","🍽 Krmení","- ráno:","- večer:","- voda:","","💩 Záchod","- ","","💊 Léky","- ","","🏠 Doma","- okna / balkon:","- kam nesmí:","","⚠️ Na co dát pozor","- ","","📞 Kontakty","- my:","- veterinář:","- pohotovost:"].join("\n");
+function catsInfo(){return ["🐈 Kočky"].concat(cats.map(c=>{const p=[c.name+" ("+[c.sex==="m"?"kocour":"kočka",(COLORS[c.color]||COLORS.seda)[1],age(c.born)].filter(Boolean).join(", ")+")"];
+  if(c.chip)p.push("  čip: "+c.chip);for(const[k,label]of CARE){const cc=c.care&&c.care[k];if(cc&&cc.last)p.push("  "+label+": naposledy "+fmtDate(cc.last))}
+  if(c.notes)p.push("  "+c.notes);return p.join("\n")})).join("\n")}
+async function saveManual(){const t=$("mText").value.replace(/\s+$/,"");const m={text:t,updated:new Date().toISOString()};
+  try{await put("meta",m,"manual");manual=m;editManual(false);toast("Mňaunuál uložen")}catch(e){toast("Uložení se nepovedlo.")}}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast("Zkopírováno, můžete vložit do zprávy");return true}catch(e){toast("Kopírování se nepovedlo.");return false}}
+$("mEdit").onclick=()=>editManual(true);
+$("mCancel").onclick=()=>editManual(false);
+$("mSave").onclick=saveManual;
+$("mTemplate").onclick=()=>insertAtEnd(M_TEMPLATE());
+$("mCats").onclick=()=>insertAtEnd(catsInfo());
+$("mCopy").onclick=()=>copyText(manual.text);
+$("mShare").onclick=async()=>{if(navigator.share){try{await navigator.share({title:"Mňaunuál",text:manual.text});return}catch(e){if(e&&e.name==="AbortError")return}}copyText(manual.text)};
 
 function renderPotty(){
   const box=$("potty");box.replaceChildren();
@@ -577,7 +630,7 @@ const b2d=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r
 async function d2b(u){return (await fetch(u)).blob()}
 $("exportBtn").onclick=async()=>{
   try{const ph={};for(const id in photos)ph[id]=await b2d(photos[id]);
-    const data=JSON.stringify({app:"kocky-doma",version:1,exported:new Date().toISOString(),cats,log,photos:ph});
+    const data=JSON.stringify({app:"kocky-doma",version:2,exported:new Date().toISOString(),cats,log,manual,photos:ph});
     const name="kocky-zaloha-"+ymd(new Date())+".json";const file=new File([data],name,{type:"application/json"});
     if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==="AbortError")return}}
     const a=h("a",{href:URL.createObjectURL(file),download:name});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Záloha stažena")}
@@ -587,14 +640,16 @@ $("importBtn").onclick=()=>{const b=$("importBtn");if(!b.dataset.arm){b.dataset.
 $("importFile").addEventListener("change",async()=>{const f=$("importFile").files[0];if(!f)return;
   try{const j=JSON.parse(await f.text());if(j.app!=="kocky-doma"||!Array.isArray(j.cats)||!Array.isArray(j.log))throw 0;
     const ph={};for(const id in j.photos||{}){if(/^data:image\//.test(j.photos[id]))ph[id]=await d2b(j.photos[id])}
-    await tx(["cats","log","photos"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id)});
-    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
+    const man=j.manual&&typeof j.manual.text==="string"?{text:j.manual.text,updated:j.manual.updated||""}:{text:"",updated:""};
+    await tx(["cats","log","photos","meta"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id);t.objectStore("meta").put(man,"manual")});
+    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;manual=man;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
   catch(e){toast("Tohle není záloha z aplikace Kočky doma.")}});
 
 /* ---------- start ---------- */
 async function start(){
   try{idb=await openDb()}catch(e){showStatus("Prohlížeč nedovolil ukládat data (anonymní okno?). Otevřete aplikaci v běžném okně.");render();return}
   [cats,log,photos]=await Promise.all([getAll("cats"),getAll("log"),getAllPhotos()]);
+  try{const m=await tx("meta","readonly",t=>t.objectStore("meta").get("manual"));if(m&&typeof m.text==="string")manual=m}catch(e){}
   if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await put("cats",c);cats.push(c)}setFlag()}
   const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await put("cats",her)}
   sortCats();sortLog();render();
