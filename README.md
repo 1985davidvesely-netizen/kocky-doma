@@ -4,6 +4,10 @@ Malá aplikace na telefon pro Oskara, Felixe a Heřmana. Zapisuje se v ní krmen
 
 Je to statická webová stránka bez serveru a bez účtů. Všechna data i fotky zůstávají jen v prohlížeči telefonu, ve kterém se aplikace používá.
 
+## Kúry léků
+
+V okně **Léky** je tlačítko *🗓 Naplánovat kúru*. Zadáte lék, časy dávek (až 4 denně), od kdy a na kolik dní, případně dlouhodobě. Na kartě kočky se pak ukazuje „Léky dnes“ s políčky na odškrtnutí. Odškrtnutá dávka se zapíše do deníku, druhým klepnutím se zruší. Nepodaná dávka víc než 2 h po čase se objeví nahoře jako upozornění. Kúru jde upravit, ukončit nebo smazat a shrnutí pro veterináře ukáže, kolik dávek bylo podáno.
+
 ## Upozornění na zdraví
 
 Nahoře v aplikaci se objeví upozornění, když:

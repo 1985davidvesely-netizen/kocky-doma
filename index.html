@@ -110,6 +110,18 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
 .dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .dlg-foot .grow{margin-right:auto}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+.courses{display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px}
+.course{display:flex;flex-direction:column;gap:6px}
+.course-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.course-h strong{min-width:0;overflow-wrap:anywhere}
+.course-h .sub{font-size:12px;white-space:nowrap}
+.slots{display:flex;flex-wrap:wrap;gap:6px}
+.slot{display:flex;align-items:center;gap:6px;padding:6px 10px;font-variant-numeric:tabular-nums;font-size:14px}
+.slot .box{width:18px;height:18px;border-radius:5px;border:2px solid var(--muted);display:grid;place-items:center;font-size:12px;line-height:1}
+.slot.done{background:var(--ok-soft);border-color:var(--ok)}
+.slot.done .box{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.slot.late{background:var(--warn-soft);border-color:var(--warn)}
+.slot small{color:var(--muted);font-size:11px}
 .alerts{display:flex;flex-direction:column;gap:8px}
 .alert{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid;text-align:left;width:100%;font-weight:400}
 .alert.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--ink)}
@@ -282,11 +294,33 @@ input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:va
     <div class="field" id="eConsF"><span class="label">Jaké</span><div class="cons" id="eCons"></div></div>
     <div class="field" id="eWeightF"><label for="eWeight">Váha (kg)</label><input id="eWeight" type="text" inputmode="decimal" autocomplete="off" pattern="\s*\d{1,2}([.,]\d{1,3})?\s*" placeholder="např. 4,5" title="Číslo v kilogramech, např. 4,5"></div>
     <div class="field"><label for="eNote" id="eNoteL">Poznámka</label><input id="eNote" maxlength="200"></div>
+    <button type="button" id="eCourse" hidden>🗓 Naplánovat kúru (více dní)</button>
     <button type="button" id="eRemind" hidden>⏰ Připomínat v kalendáři</button>
     <div class="dlg-foot">
       <button type="button" class="danger grow" id="eDel" hidden>Smazat</button>
       <button type="button" id="eCancel">Zrušit</button>
       <button class="primary" value="save" id="eSave">Zapsat</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="courseDlg">
+  <form method="dialog" id="courseForm">
+    <h2 id="kTitle">Kúra léků</h2>
+    <div class="field"><label for="kName">Lék a dávka</label><input id="kName" required maxlength="80" placeholder="např. Metacam 0,5 ml"></div>
+    <div class="field"><span class="label">Dávky během dne</span>
+      <div class="times" id="kTimes"></div>
+      <button type="button" class="small" id="kAddTime">+ další dávka</button></div>
+    <div class="two">
+      <div class="field"><label for="kStart">Od</label><input id="kStart" type="date" required></div>
+      <div class="field"><label for="kDays">Počet dní</label><input id="kDays" type="number" inputmode="numeric" min="1" max="365" value="7"></div>
+    </div>
+    <label class="check" for="kForever"><input type="checkbox" id="kForever"> Dlouhodobě, bez konce</label>
+    <div class="dlg-foot">
+      <button type="button" class="danger grow" id="kDel" hidden>Smazat kúru</button>
+      <button type="button" id="kEnd" hidden>Ukončit dnes</button>
+      <button type="button" id="kCancel">Zrušit</button>
+      <button class="primary" id="kSave">Uložit</button>
     </div>
   </form>
 </dialog>
@@ -409,6 +443,50 @@ function render(){
     try{fn()}catch(e){console.error(e);showStatus("Část „"+name+"“ se nepodařilo zobrazit ("+(e&&e.message)+"). Data jsou uložená.")}}
 }
 
+/* ---------- medication courses (stored in meta/"courses"; doses are meds log entries) ---------- */
+let courses=[],kEditing=null,kCat=null;
+const saveCourses=()=>put("meta",courses,"courses");
+const dayIdx=(k,dayKey)=>Math.round((parseYmd(dayKey)-parseYmd(k.start))/DAY);
+function courseActive(k,dayKey){const i=dayIdx(k,dayKey);return i>=0&&(!k.days||i<k.days)&&(!k.ended||dayKey<k.ended)}
+const doseOf=(k,dayKey,slot)=>log.find(e=>e.type==="meds"&&e.course===k.id&&e.day===dayKey&&e.slot===slot);
+function slotLate(slot,dayKey){const[hh,mm]=slot.split(":").map(Number);const d=parseYmd(dayKey);d.setHours(hh,mm,0,0);return Date.now()-d.getTime()>2*H}
+function courseBlock(c){
+  const today=ymd(new Date());const ks=courses.filter(k=>k.cat===c.id&&courseActive(k,today));if(!ks.length)return null;
+  return h("div",{class:"courses"},h("span",{class:"label",text:"Léky dnes"}),ks.map(k=>{
+    const i=dayIdx(k,today)+1;
+    return h("div",{class:"course"},
+      h("div",{class:"course-h"},h("strong",{text:k.name}),h("span",{class:"sub",text:k.days?"den "+i+" z "+k.days:"den "+i}),h("button",{class:"ghost small","aria-label":"Upravit kúru "+k.name,onclick:()=>openCourse(c,k),text:"Upravit"})),
+      h("div",{class:"slots"},k.times.map(t=>{const d=doseOf(k,today,t);const late=!d&&slotLate(t,today);
+        const b=h("button",{type:"button",class:"slot"+(d?" done":"")+(late?" late":""),"aria-pressed":String(!!d),"aria-label":t+(d?" podáno":" nepodáno")},
+          h("span",{class:"box",text:d?"✓":""}),t,d?h("small",{text:"podáno "+hm(new Date(d.at))}):late?h("small",{text:"zatím ne"}):null);
+        b.addEventListener("click",async()=>{
+          if(d){if(!b.dataset.arm){b.dataset.arm="1";b.lastChild.textContent="zrušit?";setTimeout(()=>{if(b.isConnected)renderCats()},3000);return}
+            await del("log",d.id);log=log.filter(x=>x.id!==d.id);render();toast("Dávka "+t+" zrušena")}
+          else await addEntry(c.id,"meds",{course:k.id,day:today,slot:t,note:k.name})});
+        return b})))}))}
+function addCourseTime(v){const box=$("kTimes");if(box.children.length>=4)return;const i=h("input",{type:"time",required:box.children.length===0,"aria-label":"Dávka "+(box.children.length+1)});i.value=v||"";box.append(i);$("kAddTime").hidden=box.children.length>=4}
+function openCourse(c,k,name){kCat=c;kEditing=k||null;$("kTitle").textContent=(k?"Upravit kúru · ":"Nová kúra · ")+c.name;
+  $("kName").value=k?k.name:(name||"");$("kTimes").replaceChildren();(k?k.times:["08:00","20:00"]).forEach(addCourseTime);
+  $("kStart").value=k?k.start:ymd(new Date());$("kForever").checked=!!(k&&!k.days);$("kDays").value=k&&k.days?k.days:7;$("kDays").disabled=$("kForever").checked;
+  for(const id of ["kDel","kEnd"]){const b=$(id);b.hidden=!k;delete b.dataset.arm}$("kDel").textContent="Smazat kúru";$("kEnd").textContent="Ukončit dnes";
+  $("courseDlg").showModal()}
+$("kAddTime").onclick=()=>addCourseTime("");
+$("kForever").onchange=()=>{$("kDays").disabled=$("kForever").checked};
+$("kCancel").onclick=()=>$("courseDlg").close();
+$("kEnd").onclick=async()=>{const b=$("kEnd");if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu ukončit?";return}
+  kEditing.ended=ymd(new Date(Date.now()+DAY));await saveCourses();render();$("courseDlg").close();toast("Kúra ukončena po dnešku")};
+$("kDel").onclick=async()=>{const b=$("kDel");if(!b.dataset.arm){b.dataset.arm="1";b.textContent="Opravdu smazat? Podané dávky v deníku zůstanou.";return}
+  courses=courses.filter(x=>x!==kEditing);await saveCourses();render();$("courseDlg").close();toast("Kúra smazána")};
+$("courseForm").addEventListener("submit",async ev=>{ev.preventDefault();
+  const name=$("kName").value.trim();const times=[...new Set([...$("kTimes").querySelectorAll("input")].map(i=>i.value).filter(Boolean))].sort();
+  if(!name||!times.length||!$("kStart").value){toast("Vyplňte lék, aspoň jeden čas a datum.");return}
+  const days=$("kForever").checked?0:Math.max(1,Math.min(365,parseInt($("kDays").value,10)||1));
+  const isNew=!kEditing;const k=kEditing||{id:"k"+uid(),cat:kCat.id,created:new Date().toISOString()};
+  Object.assign(k,{name,times,start:$("kStart").value,days});if(isNew)courses.push(k);
+  try{await saveCourses()}catch(e){toast("Uložení se nepovedlo.");return}
+  render();$("courseDlg").close();toast(isNew?"Kúra uložena":"Kúra upravena");
+  if(isNew)openReminder({cat:kCat,what:"Léky – "+kCat.name+": "+name,date:k.start,times,rep:days?"days":"forever",days})});
+
 /* ---------- health alerts ---------- */
 const H=36e5;
 function weightDrop(c){
@@ -431,6 +509,9 @@ function computeAlerts(){
     }
     const wd=weightDrop(c);
     if(wd)out.push({lvl:wd.pct>=10?"bad":"warn",ic:"⚖",cat:c,go:"card",title:c.name+" zhubl(a) o "+Math.round(wd.pct)+" %",sub:kg(wd.ref.value)+" ("+new Date(wd.ref.at).toLocaleDateString("cs-CZ",{day:"numeric",month:"numeric"})+") → "+kg(wd.last.value)+" ("+new Date(wd.last.at).toLocaleDateString("cs-CZ",{day:"numeric",month:"numeric"})+")"});
+    const today=ymd(new Date());
+    for(const k of courses.filter(k=>k.cat===c.id&&courseActive(k,today))){const miss=k.times.filter(t=>!doseOf(k,today,t)&&slotLate(t,today));
+      if(miss.length)out.push({lvl:"warn",ic:"💊",cat:c,go:"card",title:c.name+": nepodaná dávka "+k.name,sub:"Plánováno na "+miss.join(", ")+". Pokud už ji dostal(a), odškrtněte ji na kartě."})}
     for(const[k,label]of CARE){const s=careStatus(c.care&&c.care[k]);if(s.days!=null&&s.days<0)out.push({lvl:"warn",ic:"🗓",cat:c,go:"card",title:label+" – "+c.name+" po termínu",sub:"Termín byl "+s.due.toLocaleDateString("cs-CZ")+". Až bude hotovo, klepněte na kartě na Hotovo."})}
   }
   return out.sort((a,b)=>(a.lvl==="bad"?0:1)-(b.lvl==="bad"?0:1));
@@ -472,10 +553,23 @@ function vetSummary(c,days){
       L.push("  po dnech (posledních "+dd+"): ");row.forEach(r=>L.push("    "+r));
       const notes=ps.filter(e=>e.note);if(notes.length){L.push("  poznámky:");notes.forEach(e=>L.push("    "+dmy(new Date(e.at))+" "+hm(new Date(e.at))+" – "+e.note))}}}
   // meds
+  const todayK=ymd(now),fromK=ymd(from);
+  const ks=courses.filter(k=>{if(k.cat!==c.id||k.start>todayK)return false;const endK=k.days?ymd(new Date(parseYmd(k.start).getTime()+(k.days-1)*DAY)):todayK;const stop=k.ended&&k.ended<=endK?ymd(new Date(parseYmd(k.ended).getTime()-DAY)):endK;return stop>=fromK});
+  if(ks.length){L.push("","KÚRY LÉKŮ");for(const k of ks){
+    const endK=k.days?ymd(new Date(parseYmd(k.start).getTime()+(k.days-1)*DAY)):"";const stop=k.ended&&(!endK||k.ended<=endK)?ymd(new Date(parseYmd(k.ended).getTime()-DAY)):endK;
+    const lastK=stop&&stop<todayK?stop:todayK;const nDays=Math.max(0,dayIdx(k,lastK)+1);
+    // today's doses count only once their time has come
+    const dueToday=lastK===todayK?k.times.filter(t=>{const[hh,mm]=t.split(":").map(Number);const d=new Date();d.setHours(hh,mm,0,0);return d<=now}).length:k.times.length;
+    const planned=Math.max(0,nDays-1)*k.times.length+(nDays?dueToday:0);
+    const given=log.filter(e=>e.type==="meds"&&e.course===k.id&&e.day<=lastK).length;
+    L.push("  "+k.name+" – "+k.times.join(" a ")+", od "+dmy(parseYmd(k.start))+(stop?" do "+dmy(parseYmd(stop)):" dlouhodobě")+(stop&&stop<todayK?" (skončeno)":""));
+    L.push("    podáno "+given+" z "+planned+" dávek, které už měly být"+(given<planned?" (vynecháno "+(planned-given)+")":""))}}
   const ms=mine.filter(e=>e.type==="meds"&&inP(e));L.push("","LÉKY");
   if(!ms.length)L.push("  žádné nezapsány");else ms.forEach(e=>L.push("  "+dmy(new Date(e.at))+" "+hm(new Date(e.at))+" – "+(e.note||"lék")));
   // food
-  const fs=mine.filter(e=>e.type==="food"&&inP(e));if(fs.length){L.push("","KRMENÍ");L.push("  zapsáno "+fs.length+"×, průměr "+(fs.length/days).toFixed(1).replace(".",",")+"× denně")}
+  const allF=mine.filter(e=>e.type==="food"),fs=allF.filter(inP);
+  if(fs.length){const f0=new Date(allF[0].at);f0.setHours(0,0,0,0);const effF=Math.max(1,Math.min(days,Math.round((t0-f0)/DAY)+1));
+    L.push("","KRMENÍ");L.push("  zapsáno "+fs.length+"×, průměr "+(fs.length/effF).toFixed(1).replace(".",",")+"× denně"+(effF<days?" (sledováno "+effF+" "+plural(effF,"den","dny","dní")+")":""))}
   // care
   L.push("","PÉČE");for(const[k,label]of CARE){const cc=c.care&&c.care[k];L.push("  "+label+": "+(cc&&cc.last?"naposledy "+fmtDate(cc.last):"nezadáno"))}
   // notes
@@ -591,6 +685,7 @@ function renderCats(){
         h("button",{onclick:()=>openEntry(c,"weight")},h("b",{text:"⚖"}),"Váha"),
         h("button",{onclick:()=>openEntry(c,"meds")},h("b",{text:"💊"}),"Léky"),
         h("button",{onclick:()=>openEntry(c,"note")},h("b",{text:"✎"}),"Poznámka")),
+      courseBlock(c),
       h("div",{class:"facts"},
         h("div",{class:"fact"},h("span",{class:"label",text:"Naposledy jedl(a)"}),h("span",{class:"v",text:lastFood?ago(lastFood.at):"–"}),h("span",{class:"sub",text:"dnes "+todayN+"×"})),
         h("div",{class:"fact"},h("span",{class:"label",text:"Váha"}),h("span",{class:"v",text:lastW?kg(lastW.value):"–"}),weights.length>1?sparkline(weights):h("span",{class:"sub",text:"zapište vážení"}))),
@@ -668,17 +763,19 @@ function openEntry(c,type,existing,at){entryCtx={c,type,existing};
   $("eConsF").hidden=type!=="poop";entryCons=existing?(existing.cons||""):"normal";renderCons();
   $("eNoteL").textContent=type==="meds"?"Jaký lék a dávka":(type==="weight"||type==="poop"||type==="food"||type==="care")?"Poznámka (nepovinné)":"Poznámka";
   $("eNote").required=type==="meds"||type==="note";$("eNote").value=existing&&existing.note||"";
-  $("eRemind").hidden=type!=="meds";
+  $("eRemind").hidden=type!=="meds";$("eCourse").hidden=type!=="meds"||!!existing;
   $("eDel").hidden=!existing;delete $("eDel").dataset.arm;$("eDel").textContent="Smazat";$("eSave").textContent=existing?"Uložit":"Zapsat";
   $("entryDlg").showModal()}
 $("eCancel").onclick=()=>$("entryDlg").close();
+$("eCourse").onclick=()=>{if(!entryCtx)return;const n=$("eNote").value.trim(),c=entryCtx.c;$("entryDlg").close();openCourse(c,null,n)};
 $("eRemind").onclick=()=>{if(!entryCtx)return;const n=$("eNote").value.trim();const c=entryCtx.c;$("entryDlg").close();
   openReminder({cat:c,what:"Léky – "+c.name+(n?": "+n:""),date:ymd(new Date()),time:"08:00",rep:"days"})};
 
 /* ---------- calendar reminders ---------- */
 let remCtx=null;
 function addTimeInput(v){const box=$("rTimes");if(box.children.length>=4)return;const i=h("input",{type:"time",required:box.children.length===0,"aria-label":"Čas "+(box.children.length+1)});i.value=v||"";box.append(i);$("rAddTime").hidden=box.children.length>=4}
-function openReminder(o){remCtx=o;$("rTitle").textContent="Připomínka · "+o.cat.name;$("rWhat").value=o.what;$("rTimes").replaceChildren();addTimeInput(o.time||"08:00");
+function openReminder(o){remCtx=o;$("rTitle").textContent="Připomínka · "+o.cat.name;$("rWhat").value=o.what;$("rTimes").replaceChildren();(o.times&&o.times.length?o.times:[o.time||"08:00"]).forEach(addTimeInput);
+  if(o.days)$("rDays").value=o.days;
   $("rFrom").value=o.date||ymd(new Date());$("rRep").value=o.rep||"once";$("rDaysF").hidden=$("rRep").value!=="days";$("rOut").hidden=true;$("remDlg").showModal()}
 $("rAddTime").onclick=()=>addTimeInput("");
 $("rRep").onchange=()=>{$("rDaysF").hidden=$("rRep").value!=="days";$("rOut").hidden=true};
@@ -743,7 +840,7 @@ const b2d=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r
 async function d2b(u){return (await fetch(u)).blob()}
 $("exportBtn").onclick=async()=>{
   try{const ph={};for(const id in photos)ph[id]=await b2d(photos[id]);
-    const data=JSON.stringify({app:"kocky-doma",version:2,exported:new Date().toISOString(),cats,log,manual,photos:ph});
+    const data=JSON.stringify({app:"kocky-doma",version:2,exported:new Date().toISOString(),cats,log,manual,courses,photos:ph});
     const name="kocky-zaloha-"+ymd(new Date())+".json";const file=new File([data],name,{type:"application/json"});
     if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==="AbortError")return}}
     const a=h("a",{href:URL.createObjectURL(file),download:name});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Záloha stažena")}
@@ -753,9 +850,10 @@ $("importBtn").onclick=()=>{const b=$("importBtn");if(!b.dataset.arm){b.dataset.
 $("importFile").addEventListener("change",async()=>{const f=$("importFile").files[0];if(!f)return;
   try{const j=JSON.parse(await f.text());if(j.app!=="kocky-doma"||!Array.isArray(j.cats)||!Array.isArray(j.log))throw 0;
     const ph={};for(const id in j.photos||{}){if(/^data:image\//.test(j.photos[id]))ph[id]=await d2b(j.photos[id])}
+    const ks=Array.isArray(j.courses)?j.courses:[];
     const man=j.manual&&typeof j.manual.text==="string"?{text:j.manual.text,updated:j.manual.updated||""}:{text:"",updated:""};
-    await tx(["cats","log","photos","meta"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id);t.objectStore("meta").put(man,"manual")});
-    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;manual=man;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
+    await tx(["cats","log","photos","meta"],"readwrite",t=>{["cats","log","photos"].forEach(s=>t.objectStore(s).clear());j.cats.forEach(c=>t.objectStore("cats").put(c));j.log.forEach(e=>t.objectStore("log").put(e));for(const id in ph)t.objectStore("photos").put(ph[id],id);t.objectStore("meta").put(man,"manual");t.objectStore("meta").put(ks,"courses")});
+    Object.keys(photos).forEach(dropPhoto);cats=j.cats;log=j.log;photos=ph;manual=man;courses=ks;sortCats();sortLog();render();toast("Obnoveno ze zálohy")}
   catch(e){toast("Tohle není záloha z aplikace Kočky doma.")}});
 
 /* ---------- start ---------- */
@@ -764,6 +862,7 @@ async function start(){
   try{[cats,log,photos]=await Promise.all([getAll("cats"),getAll("log"),getAllPhotos()])}
   catch(e){showStatus("Data se nepodařilo načíst ("+(e&&e.message)+"). Zavřete aplikaci a otevřete ji znovu. Nic není smazané.");return}
   try{const m=await tx("meta","readonly",t=>t.objectStore("meta").get("manual"));if(m&&typeof m.text==="string")manual=m}catch(e){}
+  try{const k=await tx("meta","readonly",t=>t.objectStore("meta").get("courses"));if(Array.isArray(k))courses=k}catch(e){}
   if(!cats.length&&!log.length&&!localFlag()){for(const s of SEED){const c=Object.assign({born:"",chip:"",notes:"",photo:"",care:{vac:{last:"",every:365},dew:{last:"",every:90},flea:{last:"",every:30}}},s);await put("cats",c);cats.push(c)}setFlag()}
   const her=cats.find(c=>c.id==="herman");if(her&&her.potty===undefined){her.potty=true;await put("cats",her)}
   sortCats();sortLog();render();
